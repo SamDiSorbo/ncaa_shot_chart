@@ -1,0 +1,73 @@
+library(hoopR)
+library(ti)
+
+team_logos <- espn_mbb_teams()
+
+mbb_pbp <- hoopR::load_mbb_pbp(2021)
+
+
+entry <- mbb_pbp %>% 
+  filter(team_id == 259 & (! is.na(team_id))) %>% 
+  mutate(type = ifelse(scoring_play == TRUE, 1, 0)) %>%
+  mutate(type1 = ifelse(shooting_play == TRUE, 1, 0)) %>%
+  group_by(coordinate_x, coordinate_y) %>% 
+  summarise(
+    team_id = first(team_id),
+    shots = sum(type1),
+    makes = sum(type)
+  ) %>% 
+  left_join(team_logos, entry, by = c('team_id' = 'team_id'))
+
+
+entry$`Shot Percent` <- entry$makes/entry$shots
+entry$coordinate_x <- round(entry$coordinate_x/2)*2
+entry$coordinate_y <- round(entry$coordinate_y/2)*2
+entry <- entry %>% filter(`Shot Percent` < 1.1)
+
+
+
+
+ggplot(data=data.frame(x=1,y=1),aes(x,y))+
+  ###outside box:
+  geom_path(data=data.frame(x=c(-25,-25,25,25,-25),y=c(-47,47,47,-47,-47)))+
+  ###halfcourt line:
+  geom_path(data=data.frame(x=c(-25,25),y=c(0,0)))+
+  ###halfcourt semicircle:
+  #geom_path(data=data.frame(x=c(-6000:(-1)/1000,1:6000/1000),y=-c(sqrt(6^2-c(-6000:(-1)/1000,1:6000/1000)^2))),aes(x=x,y=y))+
+  ###solid FT semicircle above FT line:
+  geom_path(data=data.frame(x=c(-6000:(-1)/1000,1:6000/1000),y=-c(28-sqrt(6^2-c(-6000:(-1)/1000,1:6000/1000)^2))),aes(x=x,y=y))+
+  ###key:
+  geom_path(data=data.frame(x=-c(-8,-8,8,8,-8),y=-c(47,28,28,47,47)))+
+  ###box inside the key:
+  geom_path(data=data.frame(x=c(-6,-6,6,6,-6),y=-c(47,28,28,47,47)))+
+  ###rim:
+  geom_path(data=data.frame(x=c(-750:(-1)/1000,1:750/1000,750:1/1000,-1:-750/1000),y=-c(c(41.75+sqrt(0.75^2-c(-750:(-1)/1000,1:750/1000)^2)),c(41.75-sqrt(0.75^2-c(750:1/1000,-1:-750/1000)^2)))),aes(x=x,y=y))+
+  ###backboard:
+  geom_path(data=data.frame(x=c(-3,3),y=-c(43,43)),lineend='butt')+
+  ###three-point line:
+  geom_path(data=data.frame(x=c(-22,-22,-22000:(-1)/1000,1:22000/1000,22,22),y=-c(47,47-169/12,41.75-sqrt(23.75^2-c(-22000:(-1)/1000,1:22000/1000)^2),47-169/12,47)),aes(x=x,y=y))+
+  stat_summary_hex(data = entry, aes(x=coordinate_x - 25, y=coordinate_y - 41, z = `Shot Percent`), bins = 15, alpha=.7,)+
+  scale_fill_continuous(low = "white", high = "blue")+
+  ###fix aspect ratio to 1:1
+  coord_fixed()+
+  labs(
+    title = "OSU  2021 SEASON SHOT CHART",
+    caption = "Data From: hoopR, Graphic By: Sam DiSorbo @analytacist",
+    x = "",
+    y = "",
+    fill = "Shot %"
+  )+
+  theme(
+    plot.title = element_text(size = 14, hjust = 0.5, face = "bold"),
+    panel.background = element_rect(fill = "wheat2"),
+    plot.background = element_rect(fill = "wheat2"),
+    axis.text.x=element_blank(), #remove x axis labels
+    axis.ticks.x=element_blank(), #remove x axis ticks
+    axis.text.y=element_blank(),  #remove y axis labels
+    axis.ticks.y=element_blank(),  #remove y axis ticks
+    text = element_text(color = "black", family = "Palatino"),
+  )+
+  geom_image(image=entry$logo[1], x=0,y=-4, size=.25)+
+  ylim(-50, 0)
+  
+  
